@@ -14,6 +14,7 @@ import { openAgentDetail } from '@forgeax/interface/lib/open-agent-detail';
 import { useFileActivityVersion, useFileLocks } from '@forgeax/interface/lib/file-activity-stream';
 import { AgentAvatarVideo } from '@forgeax/interface/components/AgentAvatarVideo/AgentAvatarVideo';
 import { useTranslation } from '@forgeax/interface/i18n';
+import { workbenchAgentsUrl, workbenchEventsRecentUrl } from '@forgeax/interface/lib/workbench-lang';
 import {
   foldAgents,
   type CatalogItem,
@@ -379,7 +380,7 @@ function BottomPanel({
   openFile: (p: string) => Promise<void>;
   height: number;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [events, setEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const consoleLog = useAppStore((s) => s.consoleLog);
@@ -423,7 +424,7 @@ function BottomPanel({
             return;
           }
         }
-        const r = await fetch('/api/workbench/events/recent?limit=30&lang=zh');
+        const r = await fetch(workbenchEventsRecentUrl(30));
         const j = (await r.json()) as { events?: RecentEvent[] };
         if (!cancelled) {
           setEvents(j.events ?? []);
@@ -436,7 +437,7 @@ function BottomPanel({
     // timer just covers reconnect gaps / initial load races — 15s is plenty.
     const t = setInterval(fetchEvents, 15000);
     return () => { cancelled = true; clearInterval(t); };
-  }, [activeSid, fileActivityVersion]);
+  }, [activeSid, fileActivityVersion, i18n.language]);
 
   return (
     <div className="wb-bottom" style={{ height }}>
@@ -558,7 +559,8 @@ function BottomPanel({
 // empty list → render the original cm-mock placeholder so the editor area is
 // never blank.
 function WbGallery() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const openWorkbench = useAppStore((s) => s.openWorkbench);
   const [plugins, setPlugins] = useState<BusPluginInfo[] | null>(null);
   const [errored, setErrored] = useState(false);
@@ -657,8 +659,8 @@ function WbGallery() {
         {plugins.map((m, i) => {
           const rank = i + 1;
           const wbId = m.workbench?.id ?? m.id.replace(/^@forgeax-plugin\//, '');
-          const name = pickLang(m.displayName, 'zh', wbId);
-          const desc = pickLang(m.description, 'zh', '');
+          const name = pickLang(m.displayName, locale, wbId);
+          const desc = pickLang(m.description, locale, '');
           const Icon = iconForWorkbenchModule({
             workbenchId: wbId,
             label: name,
@@ -786,7 +788,7 @@ interface AgentRec {
 }
 
 export function AgentsMainArea() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const openFile = openFileAction;
   const openWorkbench = useAppStore((s) => s.openWorkbench);
   const activeSid = useAppStore((s) => s.activeSid);
@@ -824,10 +826,9 @@ export function AgentsMainArea() {
     // (the old one-shot fetch only recovered on a tab-switch remount).
     const load = async () => {
       try {
-        const qs = activeSid
-          ? `?include=files&sid=${encodeURIComponent(activeSid)}`
-          : '?include=files';
-        const r = await fetch(`/api/workbench/agents${qs}`);
+        const r = await fetch(workbenchAgentsUrl(
+          activeSid ? { include: 'files', sid: activeSid } : { include: 'files' },
+        ));
         if (cancelled) return;
         if (!r.ok) throw new Error(`${r.status}`);
         const j = (await r.json()) as { agents?: AgentRec[] };
@@ -848,7 +849,7 @@ export function AgentsMainArea() {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [activeSid]);
+  }, [activeSid, i18n.language]);
 
   const handleFileClick = (path: string) => {
     openWorkbench({ tab: 'files', expandedPluginId: null });

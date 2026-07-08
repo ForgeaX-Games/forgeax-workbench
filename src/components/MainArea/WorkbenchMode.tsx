@@ -8,6 +8,7 @@ import { useLocalSize } from '@forgeax/interface/components/Resize/ResizeHandle'
 import { listBusPlugins, pickLang, type BusPluginInfo } from '@forgeax/interface/lib/bus-api';
 import { iconForWorkbenchModule } from '@forgeax/interface/lib/workbench-module-icons';
 import { resolveNaming } from '@forgeax/interface/lib/agent-name';
+import { getLocale } from '@/i18n';
 import { WorkbenchPluginHost, pluginRendersInMainArea } from '@forgeax/interface/components/MainArea/WorkbenchPluginHost';
 import { usePanelRenderers } from '@forgeax/interface/components/DockShell/panelRenderers';
 import { openAgentDetail } from '@forgeax/interface/lib/open-agent-detail';
@@ -1236,8 +1237,8 @@ function SkinGroupCard({
             }
           />
           <div className="wm-agent-meta">
-            <span className="wm-agent-name">{group.label} · {head.name}</span>
-            <span className="wm-agent-role">{group.sublabel}</span>
+            <span className="wm-agent-name">{pickLang(group.label, getLocale(), group.label.en)} · {head.name}</span>
+            <span className="wm-agent-role">{pickLang(group.sublabel, getLocale(), group.sublabel.en)}</span>
           </div>
           {allOff
             ? <span className="wm-agent-badge">{t('workbench.disabledBadge')}</span>
@@ -1250,6 +1251,7 @@ function SkinGroupCard({
               m={m}
               isActive={m.id === activeAgentId}
               uninstalledAgentIds={uninstalledAgentIds}
+              t={t}
             />
           ))}
         </div>
@@ -1298,10 +1300,12 @@ function SkinChip({
   m,
   isActive,
   uninstalledAgentIds,
+  t,
 }: {
   m: AgentRec;
   isActive: boolean;
   uninstalledAgentIds: string[];
+  t: TFn;
 }) {
   const off = !m.isMain && uninstalledAgentIds.includes(m.id);
   const setTabAgent = useAppStore((s) => s.setTabAgent);
@@ -1318,7 +1322,7 @@ function SkinChip({
       className={`wm-skin-chip${isActive ? ' active' : ''}${off ? ' placeholder' : ''}`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      title={`${m.name} · ${m.role} · 单击切换 · 双击进 Persona 编辑`}
+      title={`${m.name} · ${m.role} · ${t('workbench.skinChipTitle')}`}
       data-agent-id={m.id}
     >
       <AgentAvatarVideo

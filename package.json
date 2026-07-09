@@ -1,10 +1,10 @@
 {
-  "name": "@forgeax/workbench",
+  "name": "@forgeax/ai-workbench",
   "version": "0.1.0",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "forgeax workbench L2 app — the workbench main-area surface (agents browser / file workbench / plugin gallery + file preview). The plugin-HOSTING runtime (iframes / keep-alive / host-sdk RPC / dock plugin panels) stays in @forgeax/interface as L1 shell infrastructure; this package is the navigation/gallery UI over it.",
+  "description": "forgeax workbench L2 app — workbench navigation, agents browser, file workbench, plugin gallery, and file preview.",
   "repository": {
     "type": "git",
     "url": "https://github.com/ForgeaX-Games/forgeax-studio.git",
@@ -13,7 +13,15 @@
   "homepage": "https://github.com/ForgeaX-Games/forgeax-studio/tree/main/packages/workbench",
   "exports": {
     ".": "./src/index.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": "./src/client/RestWorkbenchClient.ts",
+    "./components/AgentAvatarVideo/AgentAvatarVideo": "./src/components/AgentAvatarVideo/AgentAvatarVideo.tsx",
+    "./components/AgentAvatarVideo/useAgentAvatarRules": "./src/components/AgentAvatarVideo/useAgentAvatarRules.ts",
+    "./components/AgentAvatarVideo/useAgentAvatarState": "./src/components/AgentAvatarVideo/useAgentAvatarState.ts",
+    "./lib/agent-name": "./src/lib/agent-name.ts",
+    "./lib/agent-role": "./src/lib/agent-role.ts",
+    "./lib/open-agent-detail": "./src/lib/open-agent-detail.ts",
+    "./data/agent-groups": "./src/data/agent-groups.ts"
   },
   "scripts": {
     "dev": "vite",
@@ -22,6 +30,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@forgeax/design": "workspace:*",
     "@forgeax/interface": "workspace:*",
     "@google/model-viewer": "^4.2.0",
     "lucide-react": "^0.460.0",

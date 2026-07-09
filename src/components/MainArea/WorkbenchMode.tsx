@@ -2,18 +2,18 @@ import React, { createElement, useCallback, useEffect, useRef, useState, type Re
 import { createPortal } from 'react-dom';
 import { X, Eye, Pencil, Save, FileCode, FileText, FileJson, File, Columns2, Paintbrush, MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { useShellStore } from '@forgeax/interface/store';
+import { useAppStore } from '@forgeax/interface/store';
 import { useBusSnapshot } from '@forgeax/interface/lib/use-bus-snapshot';
 import { useLocalSize } from '@forgeax/interface/components/Resize/ResizeHandle';
 import { listBusPlugins, pickLang, type BusPluginInfo } from '@forgeax/interface/lib/bus-api';
 import { iconForWorkbenchModule } from '@forgeax/interface/lib/workbench-module-icons';
-import { resolveNaming } from '../../lib/agent-name';
+import { resolveNaming } from '@forgeax/interface/lib/agent-name';
 import { getLocale } from '@/i18n';
 import { WorkbenchPluginHost, pluginRendersInMainArea } from '@forgeax/interface/components/MainArea/WorkbenchPluginHost';
 import { usePanelRenderers } from '@forgeax/interface/components/DockShell/panelRenderers';
-import { openAgentDetail } from '../../lib/open-agent-detail';
+import { openAgentDetail } from '@forgeax/interface/lib/open-agent-detail';
 import { useFileActivityVersion, useFileLocks } from '@forgeax/interface/lib/file-activity-stream';
-import { AgentAvatarVideo } from '../AgentAvatarVideo/AgentAvatarVideo';
+import { AgentAvatarVideo } from '@forgeax/interface/components/AgentAvatarVideo/AgentAvatarVideo';
 import { useTranslation } from '@forgeax/interface/i18n';
 import { workbenchAgentsUrl, workbenchEventsRecentUrl } from '@forgeax/interface/lib/workbench-lang';
 import {
@@ -21,7 +21,7 @@ import {
   type CatalogItem,
   type SkinGroup,
   type SubagentFamilyGroup,
-} from '../../data/agent-groups';
+} from '@forgeax/interface/data/agent-groups';
 import {
   useFilePreview,
   openFile as openFileAction,
@@ -85,8 +85,8 @@ function placeholderText(t: (k: string) => string): string {
 }
 
 export function WorkbenchMode() {
-  const workbenchTab = useShellStore((s) => s.workbenchTab);
-  const expandedPluginId = useShellStore((s) => s.workbenchExpandedPluginId);
+  const workbenchTab = useAppStore((s) => s.workbenchTab);
+  const expandedPluginId = useAppStore((s) => s.workbenchExpandedPluginId);
   const { workbenchPanels } = usePanelRenderers();
 
   if (workbenchTab === 'agents') return <AgentsMainArea />;
@@ -384,11 +384,11 @@ function BottomPanel({
   const { t, i18n } = useTranslation();
   const [events, setEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const consoleLog = useShellStore((s) => s.consoleLog);
-  const clearConsole = useShellStore((s) => s.clearConsole);
-  const networkLog = useShellStore((s) => s.networkLog);
-  const clearNetwork = useShellStore((s) => s.clearNetwork);
-  const activeSid = useShellStore((s) => s.activeSid);
+  const consoleLog = useAppStore((s) => s.consoleLog);
+  const clearConsole = useAppStore((s) => s.clearConsole);
+  const networkLog = useAppStore((s) => s.networkLog);
+  const clearNetwork = useAppStore((s) => s.clearNetwork);
+  const activeSid = useAppStore((s) => s.activeSid);
   // WS-driven invalidation: every file-activity:done bumps the version, which
   // re-runs the fetch effect — replaces the old 4s setInterval below for
   // sessions where the WS is connected (we keep the timer as a fail-safe for
@@ -562,7 +562,7 @@ function BottomPanel({
 function WbGallery() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
-  const openWorkbench = useShellStore((s) => s.openWorkbench);
+  const openWorkbench = useAppStore((s) => s.openWorkbench);
   const [plugins, setPlugins] = useState<BusPluginInfo[] | null>(null);
   const [errored, setErrored] = useState(false);
 
@@ -791,8 +791,8 @@ interface AgentRec {
 export function AgentsMainArea() {
   const { t, i18n } = useTranslation();
   const openFile = openFileAction;
-  const openWorkbench = useShellStore((s) => s.openWorkbench);
-  const activeSid = useShellStore((s) => s.activeSid);
+  const openWorkbench = useAppStore((s) => s.openWorkbench);
+  const activeSid = useAppStore((s) => s.activeSid);
   // Drives skin-group active highlighting: which member of the skin family is
   // currently bound to the chat tab. We read `tab.agentId` (runtime truth)
   // instead of `agentBySid` (persistence cache) so the chip lit-state stays
@@ -800,7 +800,7 @@ export function AgentsMainArea() {
   // chat-side switches that update tab.agentId without going through the
   // setTabAgent action (e.g. mid-stream agent self-handoff). This mirrors
   // what ChatAgentCapsule reads.
-  const activeAgentId = useShellStore(
+  const activeAgentId = useAppStore(
     (s) => s.tabs.find((t) => t.sid === s.activeSid)?.agentId ?? null,
   );
   // Agents the user opted OUT of (Settings → Agents checkboxes). They're
@@ -1237,8 +1237,8 @@ function SkinGroupCard({
             }
           />
           <div className="wm-agent-meta">
-            <span className="wm-agent-name">{group.label} · {head.name}</span>
-            <span className="wm-agent-role">{group.sublabel}</span>
+            <span className="wm-agent-name">{pickLang(group.label, getLocale(), group.label.en)} · {head.name}</span>
+            <span className="wm-agent-role">{pickLang(group.sublabel, getLocale(), group.sublabel.en)}</span>
           </div>
           {allOff
             ? <span className="wm-agent-badge">{t('workbench.disabledBadge')}</span>
@@ -1308,8 +1308,8 @@ function SkinChip({
   t: TFn;
 }) {
   const off = !m.isMain && uninstalledAgentIds.includes(m.id);
-  const setTabAgent = useShellStore((s) => s.setTabAgent);
-  const activeSid = useShellStore((s) => s.activeSid);
+  const setTabAgent = useAppStore((s) => s.setTabAgent);
+  const activeSid = useAppStore((s) => s.activeSid);
   const handleClick = () => {
     if (activeSid) setTabAgent(activeSid, m.id);
   };

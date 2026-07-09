@@ -11,7 +11,7 @@
 
 import { publish, peek, subscribe } from '@forgeax/interface/lib/bus';
 import { useBusSnapshot } from '@forgeax/interface/lib/use-bus-snapshot';
-import { useShellStore } from '@forgeax/interface/store';
+import { useAppStore } from '@forgeax/interface/store';
 import { t } from '@forgeax/interface/i18n';
 
 export type PreviewKind = 'text' | 'image' | 'audio' | 'video' | 'model' | 'binary';
@@ -42,7 +42,7 @@ function commit(next: FilePreviewSnapshot): void {
 }
 /** 进入 workbench「文件」视图 —— ④ 壳布局仍在 L1，workbench 直接驱动。 */
 function enterFilesView(): void {
-  useShellStore.getState().openWorkbench({ tab: 'files', expandedPluginId: null });
+  useAppStore.getState().openWorkbench({ tab: 'files', expandedPluginId: null });
 }
 
 export async function openFile(path: string): Promise<void> {

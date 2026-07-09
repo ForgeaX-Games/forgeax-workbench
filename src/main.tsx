@@ -18,7 +18,7 @@ import { subscribeFileActivityStream } from '@forgeax/interface/lib/file-activit
 import { subscribePermissionStream } from '@forgeax/interface/lib/permission-stream';
 import { subscribePerceptionStream } from '@forgeax/interface/lib/perception-stream';
 import { syncBrowserPrefsFromServer, startBrowserPrefsSync } from '@forgeax/interface/lib/browser-prefs-sync';
-import { useShellStore } from '@forgeax/interface/store';
+import { useAppStore } from '@forgeax/interface/store';
 import { installHealthBridge } from '@forgeax/interface/components/StatusBar/healthBridge';
 import { WorkbenchMode } from './components/MainArea/WorkbenchMode';
 import { initFilePreview } from './file-preview';
@@ -49,12 +49,12 @@ function boot(): void {
   subscribeFileActivityStream();
   subscribePermissionStream();
   subscribePerceptionStream();
-  // Seed the surface's mode before initSessions so first paint lands on the AI workbench.
-  useShellStore.getState().setMode('ai');
-  void useShellStore.getState().initSessions();
+  // Seed the surface's mode before initSessions so first paint lands on workbench.
+  useAppStore.getState().setMode('workbench');
+  void useAppStore.getState().initSessions();
 
   if (import.meta.env.DEV) {
-    (window as unknown as Record<string, unknown>)['__dev'] = useShellStore;
+    (window as unknown as Record<string, unknown>)['__dev'] = useAppStore;
   }
   (window as unknown as { __forgeaxBoot?: { done?: () => void } }).__forgeaxBoot?.done?.();
 

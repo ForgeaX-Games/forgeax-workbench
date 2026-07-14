@@ -5,11 +5,11 @@ import ReactMarkdown from 'react-markdown';
 import { useShellStore } from '@forgeax/interface/store';
 import { useBusSnapshot } from '@forgeax/interface/lib/use-bus-snapshot';
 import { useLocalSize } from '@forgeax/interface/components/Resize/ResizeHandle';
-import { listBusPlugins, pickLang, type BusPluginInfo } from '@forgeax/interface/lib/bus-api';
+import { listExtensions, pickLang, type ExtensionInfo } from '@forgeax/interface/lib/extension-api';
 import { iconForWorkbenchModule } from '@forgeax/interface/lib/workbench-module-icons';
 import { resolveNaming } from '../../lib/agent-name';
 import { getLocale } from '@/i18n';
-import { WorkbenchPluginHost, pluginRendersInMainArea } from '@forgeax/interface/components/MainArea/WorkbenchPluginHost';
+import { WorkbenchExtensionHost, extensionRendersInMainArea } from '@forgeax/interface/components/MainArea/WorkbenchExtensionHost';
 import { usePanelRenderers } from '@forgeax/interface/components/DockShell/panelRenderers';
 import { openAgentDetail } from '../../lib/open-agent-detail';
 import { useFileActivityVersion, useFileLocks } from '@forgeax/interface/lib/file-activity-stream';
@@ -86,7 +86,7 @@ function placeholderText(t: (k: string) => string): string {
 
 export function WorkbenchMode() {
   const workbenchTab = useShellStore((s) => s.workbenchTab);
-  const expandedPluginId = useShellStore((s) => s.workbenchExpandedPluginId);
+  const expandedPluginId = useShellStore((s) => s.workbenchExpandedExtensionId);
   const { workbenchPanels } = usePanelRenderers();
 
   if (workbenchTab === 'agents') return <AgentsMainArea />;
@@ -97,8 +97,8 @@ export function WorkbenchMode() {
   // keep-alive CenterPluginLayer (overlay in MainArea) — render nothing here so
   // their iframe survives tab/mode switches instead of cold-restarting. A plugin
   // with an injected inline panel (host-registered, e.g. wb-plugin-author) still
-  // renders here via WorkbenchPluginHost.
-  if (expandedPluginId && workbenchPanels?.[expandedPluginId]) return <WorkbenchPluginHost />;
+  // renders here via WorkbenchExtensionHost.
+  if (expandedPluginId && workbenchPanels?.[expandedPluginId]) return <WorkbenchExtensionHost />;
   if (expandedPluginId) return null;
   return (
     <div className="workbench-mode">
@@ -563,12 +563,12 @@ function WbGallery() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const openWorkbench = useShellStore((s) => s.openWorkbench);
-  const [plugins, setPlugins] = useState<BusPluginInfo[] | null>(null);
+  const [plugins, setPlugins] = useState<ExtensionInfo[] | null>(null);
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    listBusPlugins('workbench')
+    listExtensions('workbench')
       .then((res) => {
         if (cancelled) return;
         const visible = res.items.filter((m) => !m.workbench?.hidden);
@@ -693,7 +693,7 @@ function WbGallery() {
                 // the center AND flip the sidebar tab in one go; single-pane
                 // plugins just flip the tab (expandedPluginId null). One action
                 // = no tab/center desync (architecture review §B3).
-                openWorkbench({ tab: `wb:${wbId}`, expandedPluginId: pluginRendersInMainArea(m) ? m.id : null });
+                openWorkbench({ tab: `wb:${wbId}`, expandedPluginId: extensionRendersInMainArea(m) ? m.id : null });
               }}
               title={titleParts.join(' · ')}
               aria-label={`#${rank} ${name}${verBumped ? ' · bumped' : ''}`}

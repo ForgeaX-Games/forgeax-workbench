@@ -4,7 +4,7 @@
 // file workbench + plugin gallery + file preview (WorkbenchMode /
 // WorkbenchModeDefault). File preview state is owned here. Some workbench
 // navigation/plugin policy still lives in @forgeax/interface as an interim
-// wrapper over the generic PluginIframeHost and should continue moving here
+// wrapper over the generic ExtensionIframeHost and should continue moving here
 // or to studio composition in the interface-architecture refactor.
 //
 // studio (L3) injects these through the interface `renderWorkbench` slot;

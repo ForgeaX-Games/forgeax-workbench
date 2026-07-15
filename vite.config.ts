@@ -3,9 +3,10 @@
 // FORGEAX_WORKBENCH_PORT.
 //
 // NOTE (submodule path): alias targets currently point at the studio-monorepo
-// sibling packages (`../interface`, `../types`, …). When this package becomes a
-// self-contained submodule that vendors interface (the editor pattern), flip
-// INTERFACE_DIR / SIB to the vendored locations (e.g. `./packages/interface`).
+// sibling packages (`../interface`, `../contracts/types`, …). When this package
+// becomes a self-contained submodule that vendors interface (the editor
+// pattern), flip INTERFACE_DIR / SIB to the vendored locations (e.g.
+// `./packages/interface`).
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
@@ -50,7 +51,7 @@ export default defineConfig({
       '@forgeax/design/theme': resolve(INTERFACE_DIR, 'packages/design/theme.ts'),
       '@forgeax/design/tokens.css': resolve(INTERFACE_DIR, 'packages/design/tokens.css'),
       '@forgeax/design': resolve(INTERFACE_DIR, 'packages/design/index.ts'),
-      '@forgeax/types': sib('types/src/index.ts'),
+      '@forgeax/types': sib('contracts/types/src/index.ts'),
       '@forgeax/host-sdk': sib('host-sdk/src/index.ts'),
     },
   },

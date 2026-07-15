@@ -21,7 +21,7 @@
  *
  * Surfaces that consume this registry (CATALOG views, per ADR-0019 §9):
  * - `packages/interface/src/components/MainArea/WorkbenchMode.tsx` (AgentsMainArea)
- * - `packages/marketplace/plugins/wb-agent-persona/index.html` (left list).
+ * - `packages/marketplace/extensions/wb-agent-persona/index.html` (left list).
  *   The iframe inlines a JS copy of this registry — when you change groups
  *   here, mirror in the iframe (search GROUP_REGISTRY).
  * - `packages/interface/src/components/SettingsPanel/SectionsRegister.tsx`
@@ -88,7 +88,7 @@ export type AgentGroup = SkinGroup | SubagentFamilyGroup;
  * what matters is which real agent ids participate.
  *
  * ⚠️ When you change this, mirror the change inside
- * `packages/marketplace/plugins/wb-agent-persona/index.html` — search for
+ * `packages/marketplace/extensions/wb-agent-persona/index.html` — search for
  * GROUP_REGISTRY there. Sources of truth for the iframe and React side are
  * independent because the iframe is a separate bundle.
  */

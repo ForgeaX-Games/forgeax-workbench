@@ -101,7 +101,7 @@ export const AGENT_GROUPS: AgentGroup[] = [
     //
     // ⚠️ `forge` is a runtime alias that only appears in
     // `/api/workbench/agents` — it is NOT a real plugin, so it is absent from
-    // `/api/bus/plugins?kind=agent` which feeds the wb-agent-persona iframe.
+    // `/api/bus/extensions?kind=agent` which feeds the wb-agent-persona iframe.
     // There the group degrades to lead=`arin` (see that file's GROUP_REGISTRY).
     id: 'producer-family',
     kind: 'subagent-family',

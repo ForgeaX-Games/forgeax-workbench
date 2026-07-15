@@ -12,15 +12,15 @@ import { getSessionClient, type ForgeaXAgentNode } from '@forgeax/interface/stor
  * `agentId` via `setTabAgent` — same single trigger ChatPanel watches for
  * WAL replay. Iter-2 will turn this into per-agent independent panels.
  *
- * `preferredAgentPluginId` is a soft hint declared in the workbench plugin
+ * `preferredAgentExtensionId` is a soft hint declared in the workbench plugin
  * manifest (provides.workbench.preferredAgent). When the active tab has no
  * matching agent yet, we badge the matching session agent to surface the
  * intent, but never lock the user — they can pick anything in the dropdown.
  */
 export function WorkbenchAgentPicker({
-  preferredAgentPluginId,
+  preferredAgentExtensionId,
 }: {
-  preferredAgentPluginId?: string;
+  preferredAgentExtensionId?: string;
 }): ReactElement | null {
   const { t } = useTranslation();
   const activeSid = useShellStore((s) => s.activeSid);
@@ -55,7 +55,7 @@ export function WorkbenchAgentPicker({
     return () => document.removeEventListener('click', onDocClick);
   }, [open]);
 
-  const preferredKey = pluginIdToAgentKey(preferredAgentPluginId);
+  const preferredKey = extensionIdToAgentKey(preferredAgentExtensionId);
   const preferredMatch = preferredKey
     ? agents.find((a) => agentMatches(a, preferredKey))
     : null;
@@ -102,9 +102,9 @@ export function WorkbenchAgentPicker({
               </button>
             );
           })}
-          {preferredAgentPluginId && !preferredMatch && (
+          {preferredAgentExtensionId && !preferredMatch && (
             <div className="wb-agent-picker-empty" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
-              {t('workbenchAgentPicker.recommendedPrefix')} <code>{preferredAgentPluginId}</code> {t('workbenchAgentPicker.recommendedSuffix')}
+              {t('workbenchAgentPicker.recommendedPrefix')} <code>{preferredAgentExtensionId}</code> {t('workbenchAgentPicker.recommendedSuffix')}
             </div>
           )}
         </div>
@@ -116,9 +116,9 @@ export function WorkbenchAgentPicker({
 /** Strip the `@scope/agent-` prefix from a plugin id to get the agent key
  *  used as `provides.agent.id` (e.g. `@forgeax-plugin/agent-cc-coder` →
  *  `cc-coder`). Returns null if the input is empty / not a plugin id. */
-function pluginIdToAgentKey(pluginId?: string): string | null {
-  if (!pluginId) return null;
-  const last = pluginId.split('/').pop() ?? '';
+function extensionIdToAgentKey(extensionId?: string): string | null {
+  if (!extensionId) return null;
+  const last = extensionId.split('/').pop() ?? '';
   return last.startsWith('agent-') ? last.slice('agent-'.length) : last;
 }
 

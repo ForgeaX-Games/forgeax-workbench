@@ -46,11 +46,11 @@ function fmtBytes(n: number): string {
 }
 
 // P3.19 — when no file is open in the workbench editor, show a bus-sourced
-// gallery of all kind=workbench plugins instead of the 2-line `cm-mock` hint.
-// Data source: `GET /api/bus/plugins?kind=workbench` (same call Sidebar P2.6a
+// gallery of all kind=workbench extensions instead of the 2-line `cm-mock` hint.
+// Data source: `GET /api/bus/extensions?kind=workbench` (same call Sidebar P2.6a
 // makes — proxied via bus-api.ts). Clicking a tile sets workbenchTab in the
 // global store so the Sidebar switches to that wb-* entry and renders its
-// BusPluginPlaceholder (full description + manifest path + deep-link).
+// BusExtensionPlaceholder (full description + manifest path + deep-link).
 // Fail-safe: fetch error → fall back to the legacy cm-mock placeholder so the
 // editor area is never empty.
 
@@ -86,20 +86,20 @@ function placeholderText(t: (k: string) => string): string {
 
 export function WorkbenchMode() {
   const workbenchTab = useShellStore((s) => s.workbenchTab);
-  const expandedPluginId = useShellStore((s) => s.workbenchExpandedExtensionId);
+  const expandedExtensionId = useShellStore((s) => s.workbenchExpandedExtensionId);
   const { workbenchPanels } = usePanelRenderers();
 
   if (workbenchTab === 'agents') return <AgentsMainArea />;
 
   if (workbenchTab === 'files') return <WorkbenchModeDefault showGalleryWhenEmpty={false} />;
 
-  // wb:* tools tab. Standalone-iframe plugins are owned by the always-mounted
-  // keep-alive CenterPluginLayer (overlay in MainArea) — render nothing here so
+  // wb:* tools tab. Standalone-iframe extensions are owned by the always-mounted
+  // keep-alive CenterExtensionLayer (overlay in MainArea) — render nothing here so
   // their iframe survives tab/mode switches instead of cold-restarting. A plugin
   // with an injected inline panel (host-registered, e.g. wb-plugin-author) still
   // renders here via WorkbenchExtensionHost.
-  if (expandedPluginId && workbenchPanels?.[expandedPluginId]) return <WorkbenchExtensionHost />;
-  if (expandedPluginId) return null;
+  if (expandedExtensionId && workbenchPanels?.[expandedExtensionId]) return <WorkbenchExtensionHost />;
+  if (expandedExtensionId) return null;
   return (
     <div className="workbench-mode">
       <div className="wb-editor"><WbGallery /></div>
@@ -563,7 +563,7 @@ function WbGallery() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const openWorkbench = useShellStore((s) => s.openWorkbench);
-  const [plugins, setPlugins] = useState<ExtensionInfo[] | null>(null);
+  const [extensions, setExtensions] = useState<ExtensionInfo[] | null>(null);
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {
@@ -573,23 +573,23 @@ function WbGallery() {
         if (cancelled) return;
         const visible = res.items.filter((m) => !m.workbench?.hidden);
         visible.sort((a, b) => (a.workbench?.position ?? 999) - (b.workbench?.position ?? 999));
-        setPlugins(visible);
+        setExtensions(visible);
       })
       .catch(() => { if (!cancelled) setErrored(true); });
     return () => { cancelled = true; };
   }, []);
 
   // Fail-safe: keep legacy hint when bus is unreachable or returned no items.
-  if (errored || (plugins && plugins.length === 0)) {
+  if (errored || (extensions && extensions.length === 0)) {
     return <pre className="cm-mock thin-scrollbar"><code>{placeholderText(t)}</code></pre>;
   }
   // First-paint window (< ~50ms) — render the frame so layout doesn't reflow.
-  if (plugins === null) {
+  if (extensions === null) {
     return (
       <div className="wb-gallery thin-scrollbar" aria-busy="true">
         <div className="wbg-header">
           <span className="wbg-title">{t('workbench.galleryTitle')}</span>
-          <span className="wbg-sub">{t('workbench.loadingPluginList')}</span>
+          <span className="wbg-sub">{t('workbench.loadingExtensionList')}</span>
         </div>
       </div>
     );
@@ -600,32 +600,32 @@ function WbGallery() {
   // reads as a sentence: "Σ 12 工作台 · 11 WIP · 5 🛠 · 4 📡" — same Σ-prefix
   // language as P4.45 AgentsHub header (`Σ N total · run·stop·dead`) and same
   // amber/orange/sky chip colors as the per-tile chips below for muscle memory.
-  const wipCount = plugins.filter((m) => m.experimental === true).length;
-  const totalTools = plugins.reduce((acc, m) => acc + (m.tools?.length ?? 0), 0);
-  const totalEvents = plugins.reduce((acc, m) => acc + (m.events?.length ?? 0), 0);
+  const wipCount = extensions.filter((m) => m.experimental === true).length;
+  const totalTools = extensions.reduce((acc, m) => acc + (m.tools?.length ?? 0), 0);
+  const totalEvents = extensions.reduce((acc, m) => acc + (m.events?.length ?? 0), 0);
   // P4.59 — bumped roll-up. Mirrors per-tile `.wbg-tile-tag.ver.bumped` from
   // A manifest version not matching /^0\.0\./ counts as "bumped" — moved
   // past placeholder semver. Surfaces as a 5th roll-up beside Σ/WIP/🛠/📡,
   // colored lavender to match the per-tile chip.
-  const bumpedCount = plugins.filter((m) => !/^0\.0\./.test(m.version ?? '0.0.0')).length;
+  const bumpedCount = extensions.filter((m) => !/^0\.0\./.test(m.version ?? '0.0.0')).length;
   const statsTitle =
-    `Σ ${plugins.length} workbench plugin · ` +
+    `Σ ${extensions.length} workbench plugin · ` +
     `${wipCount} experimental(WIP) · ` +
     `${totalTools} tool(s) on bus · ` +
     `${totalEvents} event(s) emitted · ` +
     `${bumpedCount} ${t('workbench.bumpedStatsSuffix')}`;
   const statsAria =
-    `${plugins.length} workbench plugins total — ` +
+    `${extensions.length} workbench extensions total — ` +
     `${wipCount} experimental, ${totalTools} tools, ${totalEvents} events, ${bumpedCount} bumped`;
   return (
     <div className="wb-gallery thin-scrollbar">
       <div className="wbg-header">
         <span className="wbg-title">{t('workbench.galleryTitle')}</span>
-        <span className="wbg-count">· {plugins.length} plugins</span>
+        <span className="wbg-count">· {extensions.length} extensions</span>
         <span className="wbg-stats" title={statsTitle} aria-label={statsAria} role="group">
           <span className="wbg-stats-pill wbg-stats-total">
             <span className="wbg-stats-sigma" aria-hidden>Σ</span>
-            <span className="wbg-stats-n">{plugins.length}</span>
+            <span className="wbg-stats-n">{extensions.length}</span>
           </span>
           <span className="wbg-stats-vsep" aria-hidden />
           {wipCount > 0 && (
@@ -634,12 +634,12 @@ function WbGallery() {
             </span>
           )}
           {totalTools > 0 && (
-            <span className="wbg-stats-pill wbg-stats-tools" title={`${totalTools} tool(s) on bus across all workbench plugins`}>
+            <span className="wbg-stats-pill wbg-stats-tools" title={`${totalTools} tool(s) on bus across all workbench extensions`}>
               🛠 <span className="wbg-stats-n">{totalTools}</span>
             </span>
           )}
           {totalEvents > 0 && (
-            <span className="wbg-stats-pill wbg-stats-events" title={`${totalEvents} event(s) emitted across all workbench plugins`}>
+            <span className="wbg-stats-pill wbg-stats-events" title={`${totalEvents} event(s) emitted across all workbench extensions`}>
               📡 <span className="wbg-stats-n">{totalEvents}</span>
             </span>
           )}
@@ -657,7 +657,7 @@ function WbGallery() {
         <span className="wbg-sub">{t('workbench.gallerySub')}</span>
       </div>
       <div className="wbg-grid">
-        {plugins.map((m, i) => {
+        {extensions.map((m, i) => {
           const rank = i + 1;
           const wbId = m.workbench?.id ?? m.id.replace(/^@forgeax-plugin\//, '');
           const name = pickLang(m.displayName, locale, wbId);
@@ -665,11 +665,11 @@ function WbGallery() {
           const Icon = iconForWorkbenchModule({
             workbenchId: wbId,
             label: name,
-            pluginId: m.id,
+            extensionId: m.id,
           });
           const sizeTag = m.workbench?.panelSize ?? 'md';
           // Surface bus capability counts on each tile so the gallery
-          // visually distinguishes "real" workbench plugins from pure
+          // visually distinguishes "real" workbench extensions from pure
           // placeholders. experimental:true → amber WIP chip; tools.length →
           // orange 🛠 N; events.length → sky 📡 N.
           const toolCount = m.tools?.length ?? 0;
@@ -689,18 +689,18 @@ function WbGallery() {
               key={m.id}
               className={`wbg-tile size-${sizeTag}${verBumped ? ' bumped' : ''}`}
               onClick={() => {
-                // Atomic open — split-surface plugins (Module 16) expand into
+                // Atomic open — split-surface extensions (Module 16) expand into
                 // the center AND flip the sidebar tab in one go; single-pane
-                // plugins just flip the tab (expandedPluginId null). One action
+                // extensions just flip the tab (expandedExtensionId null). One action
                 // = no tab/center desync (architecture review §B3).
-                openWorkbench({ tab: `wb:${wbId}`, expandedPluginId: extensionRendersInMainArea(m) ? m.id : null });
+                openWorkbench({ tab: `wb:${wbId}`, expandedExtensionId: extensionRendersInMainArea(m) ? m.id : null });
               }}
               title={titleParts.join(' · ')}
               aria-label={`#${rank} ${name}${verBumped ? ' · bumped' : ''}`}
             >
               <span
                 className="wbg-tile-rank"
-                title={`#${rank} of ${plugins.length} · ${t('workbench.positionDecidesOrder')}`}
+                title={`#${rank} of ${extensions.length} · ${t('workbench.positionDecidesOrder')}`}
                 aria-hidden
               >#{rank}</span>
               <span className="wbg-tile-ico" aria-hidden>
@@ -853,7 +853,7 @@ export function AgentsMainArea() {
   }, [activeSid, i18n.language]);
 
   const handleFileClick = (path: string) => {
-    openWorkbench({ tab: 'files', expandedPluginId: null });
+    openWorkbench({ tab: 'files', expandedExtensionId: null });
     void openFile(path);
   };
 

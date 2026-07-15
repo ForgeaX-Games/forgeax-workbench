@@ -42,7 +42,7 @@ function commit(next: FilePreviewSnapshot): void {
 }
 /** 进入 workbench「文件」视图 —— ④ 壳布局仍在 L1，workbench 直接驱动。 */
 function enterFilesView(): void {
-  useShellStore.getState().openWorkbench({ tab: 'files', expandedPluginId: null });
+  useShellStore.getState().openWorkbench({ tab: 'files', expandedExtensionId: null });
 }
 
 export async function openFile(path: string): Promise<void> {

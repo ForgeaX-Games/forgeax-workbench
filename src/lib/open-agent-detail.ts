@@ -1,6 +1,6 @@
 // Drill into wb-agent-persona for a specific agent.
 //
-// The iframe under /plugins/wb-agent-persona/* is same-origin, so we hand off
+// The iframe under /extensions/wb-agent-persona/* is same-origin, so we hand off
 // the selected agent id via two paths:
 //   1. localStorage — survives a fresh iframe load (cold open)
 //   2. BroadcastChannel('wb-agent-persona') — wakes an already-loaded iframe
@@ -43,5 +43,5 @@ export function openAgentDetail(
   } catch { /* old browser */ }
   const store = useShellStore.getState();
   if (switchChat && store.activeSid) store.setTabAgent(store.activeSid, agentId);
-  store.openWorkbench({ tab: WB_TAB, expandedPluginId: WB_PLUGIN_ID });
+  store.openWorkbench({ tab: WB_TAB, expandedExtensionId: WB_PLUGIN_ID });
 }

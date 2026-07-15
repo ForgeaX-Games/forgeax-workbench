@@ -1,5 +1,5 @@
 // 统一 agent 命名展示：title=「中文职能·英文名」，sub=灰字英文职能。
-// 数据由 server（/api/workbench/agents、/api/bus/plugins）算好挂在 `naming` 上；
+// 数据由 server（/api/workbench/agents、/api/bus/extensions）算好挂在 `naming` 上；
 // 这里只做读取 + 老 server / 缺字段时的兜底，避免前端各处重复拼格式。
 
 export interface AgentNaming {

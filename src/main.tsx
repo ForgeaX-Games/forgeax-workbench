@@ -19,7 +19,6 @@ import { subscribePermissionStream } from '@forgeax/interface/lib/permission-str
 import { subscribePerceptionStream } from '@forgeax/interface/lib/perception-stream';
 import { syncBrowserPrefsFromServer, startBrowserPrefsSync } from '@forgeax/interface/lib/browser-prefs-sync';
 import { useShellStore } from '@forgeax/interface/store';
-import { setActiveWorkbench } from '@forgeax/interface/lib/workbenches';
 import { installHealthBridge } from '@forgeax/interface/components/StatusBar/healthBridge';
 import { WorkbenchMode } from './components/MainArea/WorkbenchMode';
 import { initFilePreview } from './file-preview';
@@ -50,8 +49,8 @@ function boot(): void {
   subscribeFileActivityStream();
   subscribePermissionStream();
   subscribePerceptionStream();
-  // Seed the active workspace before initSessions so first paint lands on the AI workbench.
-  setActiveWorkbench('ai');
+  // Seed the surface's mode before initSessions so first paint lands on the AI workbench.
+  useShellStore.getState().setMode('ai');
   void useShellStore.getState().initSessions();
 
   if (import.meta.env.DEV) {

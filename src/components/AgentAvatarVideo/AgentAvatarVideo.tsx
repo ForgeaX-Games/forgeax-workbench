@@ -11,6 +11,7 @@
  * 它原本的 SVG/initial/img 头像, 这一层完全透明.
  */
 import { memo, useEffect, useRef, useState } from 'react';
+import { APP_EVENTS } from '@forgeax/interface/lib/storageKeys';
 import { useAgentAvatarRules } from './useAgentAvatarRules';
 import { useAgentAvatarState } from './useAgentAvatarState';
 import type { AgentAvatarRules, AgentAvatarState } from './types';
@@ -105,6 +106,8 @@ function VideoStack({ state }: { state: AgentAvatarState; rules: AgentAvatarRule
   // 两个槽分别的 src. 初次都用 state.url, 立即播.
   const [srcA, setSrcA] = useState(state.url);
   const [srcB, setSrcB] = useState<string | null>(null);
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
   // 备用槽当前在尝试加载的目标 url — 用于幂等检查 + 防御 stale onLoadedData.
   const pendingRef = useRef<string | null>(null);
 
@@ -125,6 +128,42 @@ function VideoStack({ state }: { state: AgentAvatarState; rules: AgentAvatarRule
     }
   }, [state.url, frontSlot, srcA, srcB]);
 
+  // The viewport and the workbench share one compositor surface. Four looping
+  // avatar videos are harmless while editing, but Chrome can use their video
+  // sinks to choose a 30 Hz page BeginFrame interval while Play is active.
+  // Pause only videos that were actually playing so Stop restores the user's
+  // normal avatar animation without restarting a deliberately paused video.
+  useEffect(() => {
+    const syncPlayback = (running: boolean): void => {
+      const videos = [videoARef.current, videoBRef.current].filter(
+        (video): video is HTMLVideoElement => video !== null,
+      );
+      for (const video of videos) {
+        if (running) {
+          if (!video.paused) video.dataset.forgeaxResumeAfterViewport = 'true';
+          video.pause();
+        } else if (video.dataset.forgeaxResumeAfterViewport === 'true') {
+          delete video.dataset.forgeaxResumeAfterViewport;
+          void video.play().catch(() => {
+            // Autoplay may be denied after a browser/user gesture boundary;
+            // the avatar remains paused rather than producing an unhandled
+            // rejection or retry loop.
+          });
+        }
+      }
+    };
+
+    const onViewportRunChanged = (event: Event): void => {
+      const running = (event as CustomEvent<{ running?: unknown }>).detail?.running;
+      if (typeof running === 'boolean') syncPlayback(running);
+    };
+
+    window.addEventListener(APP_EVENTS.viewportRunChanged, onViewportRunChanged);
+    const running = document.documentElement.dataset.forgeaxViewportRunning === 'true';
+    syncPlayback(running);
+    return () => window.removeEventListener(APP_EVENTS.viewportRunChanged, onViewportRunChanged);
+  }, [srcA, srcB]);
+
   const handleLoaded = (slot: 'a' | 'b', mySrc: string) => {
     // 防 stale: 备用槽载入完成时 state 可能又变了 → 检查这个 onLoadedData 对应的
     // 是不是当前 pending 目标; 不是的话 ignore (后续 effect 会再灌一次新 src).
@@ -137,6 +176,7 @@ function VideoStack({ state }: { state: AgentAvatarState; rules: AgentAvatarRule
   return (
     <>
       <video
+        ref={videoARef}
         className="aav-layer"
         src={srcA}
         autoPlay
@@ -149,6 +189,7 @@ function VideoStack({ state }: { state: AgentAvatarState; rules: AgentAvatarRule
       />
       {srcB !== null && (
         <video
+          ref={videoBRef}
           className="aav-layer"
           src={srcB}
           autoPlay

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { afterEach, describe, it, expect, beforeEach, mock } from 'bun:test';
 import { createRestWorkbenchClient } from './RestWorkbenchClient';
 
 const okJson = (body: unknown) =>
@@ -8,9 +8,13 @@ const notOk = (status: number) =>
 
 describe('RestWorkbenchClient', () => {
   let fetchSpy: ReturnType<typeof mock>;
+  const originalEventSource = globalThis.EventSource;
   beforeEach(() => {
     fetchSpy = mock(() => okJson({}));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
+  });
+  afterEach(() => {
+    globalThis.EventSource = originalEventSource;
   });
 
   const client = () => createRestWorkbenchClient();
@@ -28,17 +32,68 @@ describe('RestWorkbenchClient', () => {
     expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/agents?lang=zh');
   });
 
-  it('getActiveSlug() → GET /api/workbench/active-slug', async () => {
+  it('getActiveGame() → GET /api/workbench/active-game', async () => {
     fetchSpy.mockReturnValueOnce(okJson({ activeSlug: 'demo' }));
-    const j = await client().getActiveSlug();
-    expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-slug');
+    const j = await client().getActiveGame();
+    expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-game');
     expect(j.activeSlug).toBe('demo');
   });
 
-  it('getActiveSlug() 非 2xx 时返回 { activeSlug: null }', async () => {
+  it('getActiveGame() 非 2xx 时返回 { activeSlug: null }', async () => {
     fetchSpy.mockReturnValueOnce(notOk(500));
-    const j = await client().getActiveSlug();
+    const j = await client().getActiveGame();
     expect(j.activeSlug).toBeNull();
+  });
+
+  it('setActiveGame(slug) → PUT one canonical active-game resource', async () => {
+    fetchSpy.mockReturnValueOnce(okJson({ ok: true, activeSlug: 'demo' }));
+    const j = await client().setActiveGame('demo');
+    expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-game', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'demo' }),
+    });
+    expect(j.activeSlug).toBe('demo');
+  });
+
+  it('subscribeActiveGame() follows events and re-reads authority on reconnect', async () => {
+    class FakeEventSource {
+      static latest: FakeEventSource;
+      readonly listeners = new Map<string, Set<EventListener>>();
+      closed = false;
+      constructor(readonly url: string) { FakeEventSource.latest = this; }
+      addEventListener(type: string, listener: EventListener) {
+        const listeners = this.listeners.get(type) ?? new Set<EventListener>();
+        listeners.add(listener);
+        this.listeners.set(type, listeners);
+      }
+      removeEventListener(type: string, listener: EventListener) {
+        this.listeners.get(type)?.delete(listener);
+      }
+      close() { this.closed = true; }
+      emit(type: string, event: Event) {
+        for (const listener of this.listeners.get(type) ?? []) listener(event);
+      }
+    }
+    globalThis.EventSource = FakeEventSource as unknown as typeof EventSource;
+    const seen: Array<string | null> = [];
+    const unsubscribe = client().subscribeActiveGame?.((selection) => seen.push(selection.activeSlug));
+    const source = FakeEventSource.latest!;
+    expect(source.url).toBe('/api/events/stream?topic=workbench.active-game.changed');
+
+    source.emit('event', new MessageEvent('event', {
+      data: JSON.stringify({ payload: { activeSlug: 'event-game' } }),
+    }));
+    expect(seen).toEqual(['event-game']);
+
+    fetchSpy.mockReturnValueOnce(okJson({ activeSlug: 'authoritative-game' }));
+    source.emit('open', new Event('open'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-game');
+    expect(seen).toEqual(['event-game', 'authoritative-game']);
+
+    unsubscribe?.();
+    expect(source.closed).toBe(true);
   });
 
   it('listGames() → GET /api/workbench/games', async () => {
@@ -63,9 +118,9 @@ describe('RestWorkbenchClient', () => {
     expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/games/a%2Fb', { method: 'DELETE' });
   });
 
-  it('activateGame(slug) 服务 500 时抛出', async () => {
+  it('setActiveGame(slug) 服务 500 时抛出', async () => {
     fetchSpy.mockReturnValueOnce(notOk(500));
-    await expect(client().activateGame('demo')).rejects.toThrow(/HTTP 500/);
+    await expect(client().setActiveGame('demo')).rejects.toThrow(/HTTP 500/);
   });
 
   it('packageGame(slug) 不带 options → POST 无 body', async () => {

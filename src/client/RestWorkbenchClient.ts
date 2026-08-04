@@ -19,10 +19,50 @@ export function createRestWorkbenchClient(): WorkbenchClient {
       if (!r.ok) throw new Error(`listAgents → HTTP ${r.status}`);
       return r.json();
     },
-    async getActiveSlug() {
-      const r = await fetch('/api/workbench/active-slug');
+    async getActiveGame() {
+      const r = await fetch('/api/workbench/active-game');
       if (!r.ok) return { activeSlug: null };
       return r.json();
+    },
+    async setActiveGame(slug) {
+      const r = await fetch('/api/workbench/active-game', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      if (!r.ok) throw new Error(`setActiveGame → HTTP ${r.status}`);
+      return r.json();
+    },
+    subscribeActiveGame(listener) {
+      const source = new EventSource('/api/events/stream?topic=workbench.active-game.changed');
+      const onOpen = () => {
+        // The generic event stream has no replay cursor. Re-read the authority
+        // whenever it connects so a page cannot miss a transition while
+        // disconnected.
+        void fetch('/api/workbench/active-game')
+          .then((response) => response.ok ? response.json() : null)
+          .then((selection: { activeSlug?: unknown } | null) => {
+            const activeSlug = selection?.activeSlug;
+            if (activeSlug === null || typeof activeSlug === 'string') listener({ activeSlug });
+          })
+          .catch(() => { /* the next event or reconnect will retry */ });
+      };
+      const onEvent = (event: Event) => {
+        try {
+          const envelope = JSON.parse((event as MessageEvent<string>).data) as {
+            payload?: { activeSlug?: unknown };
+          };
+          const activeSlug = envelope.payload?.activeSlug;
+          if (activeSlug === null || typeof activeSlug === 'string') listener({ activeSlug });
+        } catch { /* malformed events do not replace the last valid projection */ }
+      };
+      source.addEventListener('open', onOpen);
+      source.addEventListener('event', onEvent);
+      return () => {
+        source.removeEventListener('open', onOpen);
+        source.removeEventListener('event', onEvent);
+        source.close();
+      };
     },
     async listGames() {
       const r = await fetch('/api/workbench/games');
@@ -41,10 +81,6 @@ export function createRestWorkbenchClient(): WorkbenchClient {
     async deleteGame(slug) {
       const r = await fetch(`/api/workbench/games/${encodeURIComponent(slug)}`, { method: 'DELETE' });
       if (!r.ok) throw new Error(`deleteGame → HTTP ${r.status}`);
-    },
-    async activateGame(slug) {
-      const r = await fetch(`/api/workbench/games/${encodeURIComponent(slug)}/activate`, { method: 'POST' });
-      if (!r.ok) throw new Error(`activateGame → HTTP ${r.status}`);
     },
     async packageGame(slug, options) {
       const hasBody = options != null;

@@ -9,8 +9,7 @@ import { listExtensions, pickLang, type ExtensionInfo } from '@forgeax/interface
 import { iconForWorkbenchModule } from '@forgeax/interface/lib/workbench-module-icons';
 import { resolveNaming } from '../../lib/agent-name';
 import { getLocale } from '@/i18n';
-import { WorkbenchExtensionHost, extensionRendersInMainArea } from '@forgeax/interface/components/MainArea/WorkbenchExtensionHost';
-import { usePanelRenderers } from '@forgeax/interface/components/DockShell/panelRenderers';
+import { openExtensionPage } from '@forgeax/interface/core/page-navigation';
 import { openAgentDetail } from '../../lib/open-agent-detail';
 import { useFileActivityVersion, useFileLocks } from '@forgeax/interface/lib/file-activity-stream';
 import { AgentAvatarVideo } from '../AgentAvatarVideo/AgentAvatarVideo';
@@ -48,7 +47,7 @@ function fmtBytes(n: number): string {
 // P3.19 — when no file is open in the workbench editor, show a bus-sourced
 // gallery of all kind=workbench extensions instead of the 2-line `cm-mock` hint.
 // Data source: `GET /api/bus/extensions?kind=workbench` (same call Sidebar P2.6a
-// makes — proxied via bus-api.ts). Clicking a tile sets workbenchTab in the
+// makes — proxied via bus-api.ts). Clicking a tile opens its registered Page in the
 // global store so the Sidebar switches to that wb-* entry and renders its
 // BusExtensionPlaceholder (full description + manifest path + deep-link).
 // Fail-safe: fetch error → fall back to the legacy cm-mock placeholder so the
@@ -85,21 +84,6 @@ function placeholderText(t: (k: string) => string): string {
 }
 
 export function WorkbenchMode() {
-  const workbenchTab = useShellStore((s) => s.workbenchTab);
-  const expandedExtensionId = useShellStore((s) => s.workbenchExpandedExtensionId);
-  const { workbenchPanels } = usePanelRenderers();
-
-  if (workbenchTab === 'agents') return <AgentsMainArea />;
-
-  if (workbenchTab === 'files') return <WorkbenchModeDefault showGalleryWhenEmpty={false} />;
-
-  // wb:* tools tab. Standalone-iframe extensions are owned by the always-mounted
-  // keep-alive CenterExtensionLayer (overlay in MainArea) — render nothing here so
-  // their iframe survives tab/mode switches instead of cold-restarting. A plugin
-  // with an injected inline panel (host-registered, e.g. wb-plugin-author) still
-  // renders here via WorkbenchExtensionHost.
-  if (expandedExtensionId && workbenchPanels?.[expandedExtensionId]) return <WorkbenchExtensionHost />;
-  if (expandedExtensionId) return null;
   return (
     <div className="workbench-mode">
       <div className="wb-editor"><WbGallery /></div>
@@ -556,13 +540,12 @@ function BottomPanel({
 // editor. Replaces the legacy 2-line `cm-mock` hint with 11 clickable tiles
 // (one per kind=workbench plugin). Each tile renders the shared Lucide module icon,
 // displayName.zh, and a truncated description.zh; clicking deep-links into
-// Sidebar's wb-* tab via store.setWorkbenchTab. fail-safe: fetch error or
+// extension Page via the shell navigation port. fail-safe: fetch error or
 // empty list → render the original cm-mock placeholder so the editor area is
 // never blank.
 function WbGallery() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
-  const openWorkbench = useShellStore((s) => s.openWorkbench);
   const [extensions, setExtensions] = useState<ExtensionInfo[] | null>(null);
   const [errored, setErrored] = useState(false);
 
@@ -693,7 +676,7 @@ function WbGallery() {
                 // the center AND flip the sidebar tab in one go; single-pane
                 // extensions just flip the tab (expandedExtensionId null). One action
                 // = no tab/center desync (architecture review §B3).
-                openWorkbench({ tab: `wb:${wbId}`, expandedExtensionId: extensionRendersInMainArea(m) ? m.id : null });
+                void openExtensionPage(m.id);
               }}
               title={titleParts.join(' · ')}
               aria-label={`#${rank} ${name}${verBumped ? ' · bumped' : ''}`}
@@ -752,7 +735,7 @@ function WbGallery() {
 }
 
 // AgentsMainArea — full-width agents workspace shown in MainArea when
-// workbenchTab === 'agents'. Fetches the same /api/workbench/agents data as
+// Agents Page body. Fetches the same /api/workbench/agents data as
 // AgentsPanel but renders it in a 2-column card grid with per-agent file
 // lists. Clicking a file opens it in the editor (switches to 'files' tab).
 //
@@ -791,7 +774,6 @@ interface AgentRec {
 export function AgentsMainArea() {
   const { t, i18n } = useTranslation();
   const openFile = openFileAction;
-  const openWorkbench = useShellStore((s) => s.openWorkbench);
   const activeSid = useShellStore((s) => s.activeSid);
   // Drives skin-group active highlighting: which member of the skin family is
   // currently bound to the chat tab. We read `tab.agentId` (runtime truth)
@@ -853,7 +835,7 @@ export function AgentsMainArea() {
   }, [activeSid, i18n.language]);
 
   const handleFileClick = (path: string) => {
-    openWorkbench({ tab: 'files', expandedExtensionId: null });
+    void openExtensionPage('@forgeax/files');
     void openFile(path);
   };
 

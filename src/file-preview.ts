@@ -5,13 +5,12 @@
  *   - 打开文件：壳发 bus 命令 'workbench:open-file' {path} → workbench 执行 openFile；
  *   - 高亮当前：壳 `useBusSnapshot('workbench:files')` 读 activeFilePath。
  *
- *  视图切换（mode='workbench' / workbenchTab='files' = ④ 仍属 L1 壳布局）由 workbench
- *  直接调 L1 `openWorkbench()`（L2→L1 合法依赖），文件内容态本身归 workbench。
+ *  视图切换通过壳层 Page navigation 打开 @forgeax/files 页面；文件内容态仍归 workbench。
  */
 
 import { publish, peek, subscribe } from '@forgeax/interface/lib/bus';
 import { useBusSnapshot } from '@forgeax/interface/lib/use-bus-snapshot';
-import { useShellStore } from '@forgeax/interface/store';
+import { openResource } from '@forgeax/interface/core/page-navigation';
 import { t } from '@forgeax/interface/i18n';
 
 export type PreviewKind = 'text' | 'image' | 'audio' | 'video' | 'model' | 'binary';
@@ -41,8 +40,14 @@ function commit(next: FilePreviewSnapshot): void {
   publish(WORKBENCH_FILES_TOPIC, next, { retain: true });
 }
 /** 进入 workbench「文件」视图 —— ④ 壳布局仍在 L1，workbench 直接驱动。 */
-function enterFilesView(): void {
-  useShellStore.getState().openWorkbench({ tab: 'files', expandedExtensionId: null });
+function enterFilesView(file: PreviewFile): void {
+  void openResource({
+    canonicalId: file.path,
+    uri: `forgeax-file://${file.path.replace(/^\/+/, '')}`,
+    displayPath: file.path,
+    mime: file.mime,
+    kind: file.kind,
+  });
 }
 
 export async function openFile(path: string): Promise<void> {
@@ -50,7 +55,8 @@ export async function openFile(path: string): Promise<void> {
   // 已打开 → 仅激活 + 切到文件视图。
   if (cur.openFiles.find((f) => f.path === path)) {
     commit({ ...cur, activeFilePath: path });
-    enterFilesView();
+    const file = cur.openFiles.find((candidate) => candidate.path === path);
+    if (file) enterFilesView(file);
     return;
   }
   const addFile = (file: PreviewFile) => {
@@ -59,7 +65,7 @@ export async function openFile(path: string): Promise<void> {
       openFiles: [...s.openFiles.filter((f) => f.path !== path), file],
       activeFilePath: path,
     });
-    enterFilesView();
+    enterFilesView(file);
   };
   try {
     const r = await fetch(`/api/files?path=${encodeURIComponent(path)}`);

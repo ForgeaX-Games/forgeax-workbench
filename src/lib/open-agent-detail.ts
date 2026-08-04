@@ -9,9 +9,9 @@
 // BroadcastChannel for live switches.
 
 import { useShellStore } from '@forgeax/interface/store';
+import { openExtensionPage } from '@forgeax/interface/core/page-navigation';
 
-const WB_TAB = 'wb:wb-agent-persona';
-const WB_PLUGIN_ID = '@forgeax-plugin/wb-agent-persona';
+const WB_PLUGIN_ID = '@forgeax-extension/wb-agent-persona';
 const STORAGE_KEY = 'wb-agent-persona:selected-agent-id';
 const CHANNEL = 'wb-agent-persona';
 
@@ -43,5 +43,5 @@ export function openAgentDetail(
   } catch { /* old browser */ }
   const store = useShellStore.getState();
   if (switchChat && store.activeSid) store.setTabAgent(store.activeSid, agentId);
-  store.openWorkbench({ tab: WB_TAB, expandedExtensionId: WB_PLUGIN_ID });
+  void openExtensionPage(WB_PLUGIN_ID);
 }

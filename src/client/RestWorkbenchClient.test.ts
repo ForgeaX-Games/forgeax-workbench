@@ -96,6 +96,33 @@ describe('RestWorkbenchClient', () => {
     expect(source.closed).toBe(true);
   });
 
+  it('subscribeActiveGame() falls back to fetch streaming when EventSource is unavailable', async () => {
+    globalThis.EventSource = undefined as unknown as typeof EventSource;
+    const encoder = new TextEncoder();
+    let pushFrame: ((frame: string) => void) | undefined;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        pushFrame = (frame) => controller.enqueue(encoder.encode(frame));
+      },
+    });
+    fetchSpy
+      .mockReturnValueOnce(Promise.resolve({ ok: true, body: stream } as Response))
+      .mockReturnValueOnce(okJson({ activeSlug: 'authoritative-game' }));
+
+    const seen: Array<string | null> = [];
+    const unsubscribe = client().subscribeActiveGame((selection) => seen.push(selection.activeSlug));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('/api/events/stream?topic=workbench.active-game.changed');
+    expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-game');
+    expect(seen).toEqual(['authoritative-game']);
+
+    pushFrame?.('event: event\ndata: {"payload":{"activeSlug":"stream-game"}}\n\n');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(seen).toEqual(['authoritative-game', 'stream-game']);
+
+    unsubscribe();
+  });
+
   it('listGames() → GET /api/workbench/games', async () => {
     fetchSpy.mockReturnValueOnce(okJson({ games: [], activeSlug: null }));
     await client().listGames();

@@ -10,6 +10,58 @@
 
 import type { WorkbenchClient } from '@forgeax/interface/store';
 
+const ACTIVE_GAME_STREAM_URL = '/api/events/stream?topic=workbench.active-game.changed';
+
+function activeGameFromEnvelope(raw: string): { activeSlug: string | null } | null {
+  try {
+    const envelope = JSON.parse(raw) as { payload?: { activeSlug?: unknown } };
+    const activeSlug = envelope.payload?.activeSlug;
+    return activeSlug === null || typeof activeSlug === 'string' ? { activeSlug } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function followActiveGameStream(
+  response: Response,
+  listener: (selection: { activeSlug: string | null }) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!response.ok || !response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let event = '';
+  let data = '';
+  try {
+    while (!signal.aborted) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      let newline: number;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline).replace(/\r$/, '');
+        buffer = buffer.slice(newline + 1);
+        if (line === '') {
+          if (event === 'event' && data) {
+            const selection = activeGameFromEnvelope(data);
+            if (selection) listener(selection);
+          }
+          event = '';
+          data = '';
+        } else if (line.startsWith('event:')) {
+          event = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          data += `${data ? '\n' : ''}${line.slice(5).trim()}`;
+        }
+      }
+    }
+  } finally {
+    try { await reader.cancel(); } catch { /* stream already closed */ }
+    reader.releaseLock();
+  }
+}
+
 export function createRestWorkbenchClient(): WorkbenchClient {
   return {
     async listAgents(opts) {
@@ -34,27 +86,51 @@ export function createRestWorkbenchClient(): WorkbenchClient {
       return r.json();
     },
     subscribeActiveGame(listener) {
-      const source = new EventSource('/api/events/stream?topic=workbench.active-game.changed');
+      const readAuthority = () => fetch('/api/workbench/active-game')
+        .then((response) => response.ok ? response.json() : null)
+        .then((selection: { activeSlug?: unknown } | null) => {
+          const activeSlug = selection?.activeSlug;
+          if (activeSlug === null || typeof activeSlug === 'string') listener({ activeSlug });
+        })
+        .catch(() => { /* the next event or reconnect will retry */ });
+
+      if (typeof EventSource === 'undefined') {
+        let closed = false;
+        let retryTimer: ReturnType<typeof setTimeout> | undefined;
+        let controller: AbortController | undefined;
+        const connect = async (): Promise<void> => {
+          controller = new AbortController();
+          try {
+            const response = await fetch(ACTIVE_GAME_STREAM_URL, { signal: controller.signal });
+            if (closed) return;
+            // The stream is established before this read, so a change racing
+            // with the snapshot is observed either by the snapshot or by the
+            // subsequently consumed stream.
+            await readAuthority();
+            await followActiveGameStream(response, listener, controller.signal);
+          } catch {
+            /* reconnect below */
+          }
+          if (!closed) retryTimer = setTimeout(() => void connect(), 1_000);
+        };
+        void connect();
+        return () => {
+          closed = true;
+          if (retryTimer !== undefined) clearTimeout(retryTimer);
+          controller?.abort();
+        };
+      }
+
+      const source = new EventSource(ACTIVE_GAME_STREAM_URL);
       const onOpen = () => {
         // The generic event stream has no replay cursor. Re-read the authority
         // whenever it connects so a page cannot miss a transition while
         // disconnected.
-        void fetch('/api/workbench/active-game')
-          .then((response) => response.ok ? response.json() : null)
-          .then((selection: { activeSlug?: unknown } | null) => {
-            const activeSlug = selection?.activeSlug;
-            if (activeSlug === null || typeof activeSlug === 'string') listener({ activeSlug });
-          })
-          .catch(() => { /* the next event or reconnect will retry */ });
+        void readAuthority();
       };
       const onEvent = (event: Event) => {
-        try {
-          const envelope = JSON.parse((event as MessageEvent<string>).data) as {
-            payload?: { activeSlug?: unknown };
-          };
-          const activeSlug = envelope.payload?.activeSlug;
-          if (activeSlug === null || typeof activeSlug === 'string') listener({ activeSlug });
-        } catch { /* malformed events do not replace the last valid projection */ }
+        const selection = activeGameFromEnvelope((event as MessageEvent<string>).data);
+        if (selection) listener(selection);
       };
       source.addEventListener('open', onOpen);
       source.addEventListener('event', onEvent);

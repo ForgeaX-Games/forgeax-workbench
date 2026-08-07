@@ -8,25 +8,15 @@
 // 逐字复刻,只把 import 从 workbench-client.ts 内部换成 @forgeax/interface/store。
 // Bump 4 会删除 interface 侧的兜底,由本 factory 单点接管。
 
-import type { ActiveGameSelection, RuntimeScopeState, WorkbenchClient } from '@forgeax/interface/store';
+import type { WorkbenchClient } from '@forgeax/interface/store';
 
 const ACTIVE_GAME_STREAM_URL = '/api/events/stream?topic=workbench.active-game.changed';
 
-function normalizeActiveGame(raw: unknown): ActiveGameSelection | null {
-  if (raw === null || typeof raw !== 'object') return null;
-  const candidate = raw as { activeSlug?: unknown; runtime?: unknown };
-  const activeSlug = candidate.activeSlug;
-  if (!(activeSlug === null || typeof activeSlug === 'string')) return null;
-  const runtime = candidate.runtime;
-  return runtime !== undefined && runtime !== null && typeof runtime === 'object'
-    ? { activeSlug, runtime: runtime as RuntimeScopeState }
-    : { activeSlug };
-}
-
-function activeGameFromEnvelope(raw: string): ActiveGameSelection | null {
+function activeGameFromEnvelope(raw: string): { activeSlug: string | null } | null {
   try {
-    const envelope = JSON.parse(raw) as { payload?: unknown };
-    return normalizeActiveGame(envelope.payload);
+    const envelope = JSON.parse(raw) as { payload?: { activeSlug?: unknown } };
+    const activeSlug = envelope.payload?.activeSlug;
+    return activeSlug === null || typeof activeSlug === 'string' ? { activeSlug } : null;
   } catch {
     return null;
   }
@@ -34,7 +24,7 @@ function activeGameFromEnvelope(raw: string): ActiveGameSelection | null {
 
 async function followActiveGameStream(
   response: Response,
-  listener: (selection: ActiveGameSelection) => void,
+  listener: (selection: { activeSlug: string | null }) => void,
   signal: AbortSignal,
 ): Promise<void> {
   if (!response.ok || !response.body) return;
@@ -84,7 +74,7 @@ export function createRestWorkbenchClient(): WorkbenchClient {
     async getActiveGame() {
       const r = await fetch('/api/workbench/active-game');
       if (!r.ok) return { activeSlug: null };
-      return normalizeActiveGame(await r.json()) ?? { activeSlug: null };
+      return r.json();
     },
     async setActiveGame(slug) {
       const r = await fetch('/api/workbench/active-game', {
@@ -93,16 +83,14 @@ export function createRestWorkbenchClient(): WorkbenchClient {
         body: JSON.stringify({ slug }),
       });
       if (!r.ok) throw new Error(`setActiveGame → HTTP ${r.status}`);
-      const selection = normalizeActiveGame(await r.json());
-      if (selection === null) throw new Error('setActiveGame → invalid active-game response');
-      return selection;
+      return r.json();
     },
     subscribeActiveGame(listener) {
       const readAuthority = () => fetch('/api/workbench/active-game')
         .then((response) => response.ok ? response.json() : null)
-        .then((raw: unknown) => {
-          const selection = normalizeActiveGame(raw);
-          if (selection !== null) listener(selection);
+        .then((selection: { activeSlug?: unknown } | null) => {
+          const activeSlug = selection?.activeSlug;
+          if (activeSlug === null || typeof activeSlug === 'string') listener({ activeSlug });
         })
         .catch(() => { /* the next event or reconnect will retry */ });
 

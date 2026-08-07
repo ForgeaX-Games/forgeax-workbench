@@ -33,18 +33,10 @@ describe('RestWorkbenchClient', () => {
   });
 
   it('getActiveGame() → GET /api/workbench/active-game', async () => {
-    fetchSpy.mockReturnValueOnce(okJson({
-      activeSlug: 'demo',
-      runtime: {
-        status: 'ready',
-        binding: { scopeId: 'studio-demo', generation: 7 },
-      },
-    }));
+    fetchSpy.mockReturnValueOnce(okJson({ activeSlug: 'demo' }));
     const j = await client().getActiveGame();
     expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-game');
     expect(j.activeSlug).toBe('demo');
-    expect(j.runtime?.binding?.scopeId).toBe('studio-demo');
-    expect(j.runtime?.binding?.generation).toBe(7);
   });
 
   it('getActiveGame() 非 2xx 时返回 { activeSlug: null }', async () => {
@@ -54,14 +46,7 @@ describe('RestWorkbenchClient', () => {
   });
 
   it('setActiveGame(slug) → PUT one canonical active-game resource', async () => {
-    fetchSpy.mockReturnValueOnce(okJson({
-      ok: true,
-      activeSlug: 'demo',
-      runtime: {
-        status: 'ready',
-        binding: { scopeId: 'studio-demo', generation: 8 },
-      },
-    }));
+    fetchSpy.mockReturnValueOnce(okJson({ ok: true, activeSlug: 'demo' }));
     const j = await client().setActiveGame('demo');
     expect(fetchSpy).toHaveBeenCalledWith('/api/workbench/active-game', {
       method: 'PUT',
@@ -69,7 +54,6 @@ describe('RestWorkbenchClient', () => {
       body: JSON.stringify({ slug: 'demo' }),
     });
     expect(j.activeSlug).toBe('demo');
-    expect(j.runtime?.binding?.generation).toBe(8);
   });
 
   it('subscribeActiveGame() follows events and re-reads authority on reconnect', async () => {

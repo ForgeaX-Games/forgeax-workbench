@@ -11,6 +11,12 @@
 import type { ActiveGameSelection, RuntimeScopeState, WorkbenchClient } from '@forgeax/interface/store';
 
 const ACTIVE_GAME_STREAM_URL = '/api/events/stream?topic=workbench.active-game.changed';
+const ACTIVE_GAME_TRANSIENT_RETRIES = 8;
+const ACTIVE_GAME_TRANSIENT_RETRY_DELAY_MS = 250;
+
+function waitForActiveGameRetry(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ACTIVE_GAME_TRANSIENT_RETRY_DELAY_MS));
+}
 
 function normalizeActiveGame(raw: unknown): ActiveGameSelection | null {
   if (raw === null || typeof raw !== 'object') return null;
@@ -87,11 +93,20 @@ export function createRestWorkbenchClient(): WorkbenchClient {
       return normalizeActiveGame(await r.json()) ?? { activeSlug: null };
     },
     async setActiveGame(slug) {
-      const r = await fetch('/api/workbench/active-game', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug }),
-      });
+      let r: Response;
+      for (let attempt = 0; ; attempt += 1) {
+        r = await fetch('/api/workbench/active-game', {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ slug }),
+        });
+        // The server returns 503 only after it has persisted the requested
+        // selection but the Play sidecar could not bind yet. Keep the one
+        // canonical write in flight through the normal startup race; all
+        // other status codes remain immediate product errors.
+        if (r.status !== 503 || attempt >= ACTIVE_GAME_TRANSIENT_RETRIES) break;
+        await waitForActiveGameRetry();
+      }
       if (!r.ok) throw new Error(`setActiveGame → HTTP ${r.status}`);
       const selection = normalizeActiveGame(await r.json());
       if (selection === null) throw new Error('setActiveGame → invalid active-game response');

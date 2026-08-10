@@ -72,6 +72,25 @@ describe('RestWorkbenchClient', () => {
     expect(j.runtime?.binding?.generation).toBe(8);
   });
 
+  it('setActiveGame(slug) retries transient runtime-unavailable responses', async () => {
+    fetchSpy
+      .mockReturnValueOnce(notOk(503))
+      .mockReturnValueOnce(okJson({
+        ok: true,
+        activeSlug: 'demo',
+        runtime: {
+          status: 'ready',
+          binding: { scopeId: 'studio-demo', generation: 9 },
+        },
+      }));
+
+    const j = await client().setActiveGame('demo');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(j.activeSlug).toBe('demo');
+    expect(j.runtime?.binding?.generation).toBe(9);
+  });
+
   it('subscribeActiveGame() follows events and re-reads authority on reconnect', async () => {
     class FakeEventSource {
       static latest: FakeEventSource;

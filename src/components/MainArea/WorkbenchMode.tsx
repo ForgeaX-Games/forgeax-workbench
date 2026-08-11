@@ -6,7 +6,7 @@ import { useShellStore } from '@forgeax/interface/store';
 import { useBusSnapshot } from '@forgeax/interface/lib/use-bus-snapshot';
 import { useLocalSize } from '@forgeax/interface/components/Resize/ResizeHandle';
 import { listExtensions, pickLang, type ExtensionInfo } from '@forgeax/interface/lib/extension-api';
-import { iconForWorkbenchModule } from '@forgeax/interface/lib/workbench-module-icons';
+import { lucideIconOrBox } from '@forgeax/interface/lib/lucide-icon';
 import { resolveNaming } from '../../lib/agent-name';
 import { getLocale } from '@/i18n';
 import { openExtensionPage } from '@forgeax/interface/core/page-navigation';
@@ -645,11 +645,12 @@ function WbGallery() {
           const wbId = m.workbench?.id ?? m.id.replace(/^@forgeax-plugin\//, '');
           const name = pickLang(m.displayName, locale, wbId);
           const desc = pickLang(m.description, locale, '');
-          const Icon = iconForWorkbenchModule({
-            workbenchId: wbId,
-            label: name,
-            extensionId: m.id,
-          });
+          const Icon = lucideIconOrBox(
+            m.contributes?.activities?.[0]?.icon
+              ?? m.contributes?.pages?.[0]?.icon
+              ?? m.workbench?.icon
+              ?? m.icon,
+          );
           const sizeTag = m.workbench?.panelSize ?? 'md';
           // Surface bus capability counts on each tile so the gallery
           // visually distinguishes "real" workbench extensions from pure

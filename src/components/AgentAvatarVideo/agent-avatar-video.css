@@ -39,6 +39,15 @@
   /* WebKit (.app/WKWebView) 渲染 webm 透明通道时偶尔有半像素 sub-pixel 锯齿,
    * transform: translateZ(0) 强制 GPU compositing 干净一点. */
   transform: translateZ(0);
+  z-index: 1;
+}
+
+/* HEVC-with-alpha is decoded correctly by WebKit, but forcing the <video> into
+ * an additional transformed/opacity compositor layer can collapse its alpha
+ * output to fully transparent inside WKWebView. Desktop keeps native video
+ * compositing; object-fit/object-position still provide deterministic framing. */
+.agent-avatar-video[data-runtime="tauri"] .aav-layer {
+  transform: none !important;
 }
 
 /* Per-agent 微调: 美术资源不同 agent 头部 Y 位置 / 脸占比不一致, 单独调缩放和
@@ -87,6 +96,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
 }

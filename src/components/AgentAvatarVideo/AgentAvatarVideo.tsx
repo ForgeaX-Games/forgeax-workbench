@@ -11,9 +11,7 @@
  * 它原本的 SVG/initial/img 头像, 这一层完全透明.
  */
 import { memo, useEffect, useRef, useState } from 'react';
-import { platformRuntime } from '@forgeax/interface/lib/platform';
 import { APP_EVENTS } from '@forgeax/interface/lib/storageKeys';
-import { agentAvatarVideoUrl } from './avatar-playback-policy';
 import { useAgentAvatarRules } from './useAgentAvatarRules';
 import { useAgentAvatarState } from './useAgentAvatarState';
 import type { AgentAvatarRules, AgentAvatarState } from './types';
@@ -29,7 +27,7 @@ interface Props {
   className?: string;
   /** rules 还没拿到 / agent 没 avatarSet 时降级渲染什么 (老 SVG / initials / emoji). */
   fallback: React.ReactNode;
-  /** 是否始终在视频下保留 fallback (调试用). 默认 false. */
+  /** 是否在视频上叠 fallback (调试用 或 透明 PNG webm 上要保留底色). 默认 false. */
   showFallbackUnder?: boolean;
 }
 
@@ -57,23 +55,14 @@ export const AgentAvatarVideo = memo(function AgentAvatarVideo({
     mode === 'conversational' ? agentId : null,
     rules,
   );
-  const [hasRenderableFrame, setHasRenderableFrame] = useState(false);
-
-  useEffect(() => {
-    setHasRenderableFrame(false);
-  }, [agentId]);
 
   if (!rules) {
-    // 资源没准备好时, 老头像继续顶上.
+    // 资源没准备好, 不显示空白方块 — 老头像继续顶上.
     return <>{fallback}</>;
   }
 
   const stateName = mode === 'idle' ? rules.default : (conversationalState ?? rules.default);
   const state = pickState(rules, stateName);
-  const runtime = platformRuntime();
-  const videoUrl = agentAvatarVideoUrl(state, runtime);
-  if (!videoUrl) return <>{fallback}</>;
-  const playbackState = videoUrl === state.url ? state : { ...state, url: videoUrl };
   // 取 agent id 末段做 data-agent-id (跟 server 端 def.id 对齐); CSS 里可以按
   // [data-agent-id="suzu"] 做单 agent 微调 (e.g. suzu 美术资源头顶留白多, 需要小幅
   // 放大 + 上推). 见 agent-avatar-video.css.
@@ -86,17 +75,10 @@ export const AgentAvatarVideo = memo(function AgentAvatarVideo({
       data-state={state.state}
       data-mode={mode}
       data-agent-id={dataAgentId}
-      data-runtime={runtime}
       aria-hidden
     >
-      {(showFallbackUnder || !hasRenderableFrame) && (
-        <span className="aav-fallback-under">{fallback}</span>
-      )}
-      <VideoStack
-        state={playbackState}
-        onFrameReady={() => setHasRenderableFrame(true)}
-        onFrontError={() => setHasRenderableFrame(false)}
-      />
+      {showFallbackUnder && <span className="aav-fallback-under">{fallback}</span>}
+      <VideoStack state={state} rules={rules} />
     </span>
   );
 });
@@ -118,15 +100,7 @@ export const AgentAvatarVideo = memo(function AgentAvatarVideo({
  *
  * 强制 loop=true (忽略 AVATAR.md 里的 loop=false); 见用户反馈.
  */
-function VideoStack({
-  state,
-  onFrameReady,
-  onFrontError,
-}: {
-  state: AgentAvatarState;
-  onFrameReady: () => void;
-  onFrontError: () => void;
-}) {
+function VideoStack({ state }: { state: AgentAvatarState; rules: AgentAvatarRules }) {
   // 哪个槽是当前可见的前景.
   const [frontSlot, setFrontSlot] = useState<'a' | 'b'>('a');
   // 两个槽分别的 src. 初次都用 state.url, 立即播.
@@ -191,26 +165,12 @@ function VideoStack({
   }, [srcA, srcB]);
 
   const handleLoaded = (slot: 'a' | 'b', mySrc: string) => {
-    const front = frontSlot === 'a' ? srcA : srcB;
-    if (slot === frontSlot) {
-      if (mySrc === front) onFrameReady();
-      return;
-    }
     // 防 stale: 备用槽载入完成时 state 可能又变了 → 检查这个 onLoadedData 对应的
     // 是不是当前 pending 目标; 不是的话 ignore (后续 effect 会再灌一次新 src).
+    if (slot === frontSlot) return; // already front, nothing to do
     if (mySrc !== pendingRef.current) return;
     setFrontSlot(slot);
     pendingRef.current = null;
-    onFrameReady();
-  };
-
-  const handleError = (slot: 'a' | 'b', mySrc: string) => {
-    const front = frontSlot === 'a' ? srcA : srcB;
-    if (slot === frontSlot && mySrc === front) {
-      onFrontError();
-      return;
-    }
-    if (mySrc === pendingRef.current) pendingRef.current = null;
   };
 
   return (
@@ -224,9 +184,8 @@ function VideoStack({
         playsInline
         loop
         preload="auto"
-        style={{ visibility: frontSlot === 'a' ? 'visible' : 'hidden' }}
+        style={{ opacity: frontSlot === 'a' ? 1 : 0 }}
         onLoadedData={() => handleLoaded('a', srcA)}
-        onError={() => handleError('a', srcA)}
       />
       {srcB !== null && (
         <video
@@ -238,9 +197,8 @@ function VideoStack({
           playsInline
           loop
           preload="auto"
-          style={{ visibility: frontSlot === 'b' ? 'visible' : 'hidden' }}
+          style={{ opacity: frontSlot === 'b' ? 1 : 0 }}
           onLoadedData={() => handleLoaded('b', srcB)}
-          onError={() => handleError('b', srcB)}
         />
       )}
     </>

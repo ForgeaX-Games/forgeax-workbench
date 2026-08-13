@@ -17,6 +17,7 @@ export type AgentAvatarEvent =
 export interface AgentAvatarState {
   state: string;
   url: string;
+  desktopUrl?: string;
   loop: boolean;
   fadeInMs: number;
   onEnd?: string;
